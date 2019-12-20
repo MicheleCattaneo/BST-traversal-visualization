@@ -1,51 +1,74 @@
 ;; The first three lines of this file were inserted by DrRacket. They record metadata
 ;; about the language level of this file in a form that our tools can easily process.
 #reader(lib "htdp-intermediate-lambda-reader.ss" "lang")((modname project) (read-case-sensitive #t) (teachpacks ()) (htdp-settings #(#t constructor repeating-decimal #f #t none #f () #f)))
+;Project by Michele Cattaneo and Davide Scannapieco
 ;---------------------------------------------------------------------------
 ;
 ;
-;                         TREE ALGORITHM VISUALIZER
+;                         TREE TRAVERSAL VISUALIZER
 ;
 ;
 ;---------------------------------------------------------------------------
-;GLOBAL CONSTANTS
+; Goal: This software allows to interactively visualize a traversal algoroithm on
+; one or more given Binary Search Trees.
+;
+; The following algorithms can be seen:
+;  - In Order Traversal
+;  - Pre Order Traversal
+;  - Post Order Traversal
+;
+; To try your own BSTs:
+; Modify the multiple.csv file as follows:
+; Each row of comma separated numbers represents a tree
+; This row generates a tree going backwards, meaning that the last number of the list will be the
+; the root of the whole tree, the second-last number will be inserted in the tree made of the last
+; one ( a tree of 1 node ), the third-last will be inserted in the tree made by the previous 2 and so on
+; For simplicity, given a tree, to visualize it, it is required to write the numbers starting from the
+; lowest level, from left to right, going up to the next level up until the root
+; Example:
+;          20
+;        /   \
+;      10    30
+;     /  \     \
+;    5   15     35
+; Is the result of a list formed like this: 5, 15, 35, 10, 30, 20
+;
+; To run the code:
+; type: (main 0) inside the interaction area
+
+; GLOBAL CONSTANTS
+; Heigth and width of the graphical interface
 (define HEIGTH 500)
 (define WIDTH 1500)
 
-
-
-
 ; Libraries Requiring
-
 (require 2htdp/image)
 (require 2htdp/universe)
 (require 2htdp/batch-io)
 
-
-
-
 ; a Node is one of :
 ; (make-leaf)
 ; (make-node BST Value BST x y Color)
-; a value is a number
-; x y are coordinates of that node on a canvas
-; different a color is a number and it depends of the state of the node.
+; a value is a number, representing the value of the node
+; x y are coordinates of the node given to represent it on a canvas
+; a color is a number and represents one of the possible coloration that a node has
 ; NodeColor is one of:
 ; - 0 for white
 ; - 1 for red
 ; - 2 for green
-; a App is a (make-app List<List<Number>> Number Number ) where the list of list is a rappresentation
-; of nodes' parameters (x y value color), and the iterator is a NatNumber
-; representing at which step the application is.
-; Alg is a Natural Number between [0,2] that represent a function.
-; Current-Tree is a Natural Number between 
 
+; an App is a (make-app tree iterator alg current-tree depth event-list radius ) where:
+; tree is a BST representing the tree currently being displayed
+; iterator is a Number representing the number of steps already performed in the algorithm
+; alg is a Number representing one of the possible algorithms to perform
+; current-tree is a Number representing which list of the List<List<Number>> is currently used as tree
+; depth is a Number representing the depth of each level of the BST when displayed
+; event-list is a List<Number> representing a list of successive Node values being visited by the algorithm
+; radius is a Number representing the radius of each node when displayed
 
 (define-struct node [left value right x y color])
 (define-struct leaf [])
-(define-struct app [tree iterator alg current-tree depth event-list])
-
-
+(define-struct app [tree iterator alg current-tree depth event-list radius])
 
 ;---------------------------------------------------------------------------
 ;
@@ -63,8 +86,6 @@
 
 (check-expect (not-set-node (make-leaf) 0 (make-leaf)) (make-node (make-leaf) 0 (make-leaf) 0 0 0))
 
-
-
 ;---------------------------------------------------------------------------
 ;
 ;
@@ -74,19 +95,17 @@
 ;---------------------------------------------------------------------------
 
 ; Number BST -> BST
-; Given a list of numbers, return a BST (Binary Search Tree) 
+; Given a number, return a BST (Binary Search Tree) with the new number inserted
 
 (define (insert-tree x tree)
   (cond [(leaf? tree) (not-set-node (make-leaf) x (make-leaf))]
         [(node? tree) (cond [(< x (node-value tree)) (not-set-node (insert-tree x (node-left tree))
                                                                    (node-value tree)
                                                                    (node-right tree))]
-                            [( = x (node-value tree)) tree]
+                            [( = x (node-value tree)) tree] 
                             [(> x (node-value tree)) (not-set-node (node-left tree)
                                                                    (node-value tree)
                                                                    (insert-tree x (node-right tree)))])]))
-
-
 
 (define SET-1
   (not-set-node(not-set-node (not-set-node(make-leaf) 2 (make-leaf))
@@ -106,7 +125,6 @@
                (not-set-node(not-set-node(make-leaf) 7 (make-leaf))
                             8
                             (not-set-node(make-leaf) 9 (not-set-node (make-leaf) 10 (make-leaf))))))
-
 
 ;---------------------------------------------------------------------------
 ;
@@ -142,7 +160,6 @@
                                         11 (make-leaf) 0 0 0)
                              15 (make-node (make-leaf) 16 (make-leaf) 0 0 0) 0 0 0) 0 0 0))
 
-
 ;---------------------------------------------------------------------------
 ;
 ;
@@ -161,83 +178,81 @@
                (save-nodes (node-left tree))
                (save-nodes (node-right tree)))])) 
 
-;(save-nodes (set-coord SET-1  0 0 1000))
+
 (check-expect (save-nodes SET-1) (list (list 0 0 6 0) (list 0 0 3 0) (list 0 0 2 0)
-                                       (list 0 0 4 0) (list 0 0 8 0) (list 0 0 7 0) (list 0 0 9 0))) 
-
-
+                                       (list 0 0 4 0) (list 0 0 8 0) (list 0 0 7 0) (list 0 0 9 0)))
 
 ;---------------------------------------------------------------------------
 ;
 ;
-;                             FOO FUNCTION
-;
-;
-;---------------------------------------------------------------------------
-
-
-;BST -> List<Number>
-;Given a Tree returns a list such that:
-; let i be an index of the list
-; if list(i) is not present in list(0)-list(i-1) it means that the node with the number=list(i) has to be coloured in red
-; else the node with the number=list(i) has to be coloured in green.
-;The result is that a node is coloured in red when visited, and in green when it is the result of the in-order traversal.
-
-(define (foo tree)
-  (cond [(leaf? tree) ' ()]
-        [else (append (list(node-value tree))
-                      (foo (node-left tree))
-                      (list(node-value tree))
-                      (foo (node-right tree))
-                      )]))
-
-;(foo SET-1)
-(check-expect (foo SET-1) 
-              (list 6 3 2 2 3 4 4 6 8 7 7 8 9 9))
-;---------------------------------------------------------------------------
-;
-;
-;                             FOO-POST-ORDER
-;
-;
-;---------------------------------------------------------------------------
-
-;BST -> List<Number>
-
-(define (foo-post-order tree)
-  (cond [(leaf? tree) ' ()]
-        [else (append (list(node-value tree))
-                      (foo-post-order (node-left tree))
-                      (foo-post-order (node-right tree))
-                      (list(node-value tree)))]))
-
-(check-expect (foo-post-order SET-1) 
-              (list 6 3 2 2 4 4 3 8 7 7 9 9 8 6))
-
-;---------------------------------------------------------------------------
-;
-;
-;                             FOO-PRE-ORDER
+;                             MAKE-IN-ORDER-EVENTS
 ;
 ;
 ;---------------------------------------------------------------------------
 
 ; BST -> List<Number>
+; Given a Tree returns a list such that is the combination of a pre-order and in-order traversal
+; this way a number is inserted into the list twice, the first time when visited and the second time
+; when marked by the algorithm we want.
+; Later, when the color needs to be set, say we are at the i-th element of the list, if in the sublist
+; going from 0 to i-1 such node is already present, that node at index i will be coloured in red, otherwise
+; in green.
 
-(define (foo-pre-order tree)
+(define (make-in-order-events tree)
+  (cond [(leaf? tree) ' ()]
+        [else (append (list(node-value tree))
+                      (make-in-order-events (node-left tree))
+                      (list(node-value tree))
+                      (make-in-order-events (node-right tree))
+                      )]))
+
+
+(check-expect (make-in-order-events SET-1) 
+              (list 6 3 2 2 3 4 4 6 8 7 7 8 9 9))
+;---------------------------------------------------------------------------
+;
+;
+;                             MAKE-POST-ORDER-EVENTS
+;
+;
+;---------------------------------------------------------------------------
+
+; BST -> List<Number>
+; Same concept as the make-in-order-events function, the only difference is the combination
+; of pre-order and post-order
+
+(define (make-post-order-events tree)
+  (cond [(leaf? tree) ' ()]
+        [else (append (list(node-value tree))
+                      (make-post-order-events (node-left tree))
+                      (make-post-order-events (node-right tree))
+                      (list(node-value tree)))]))
+
+(check-expect (make-post-order-events SET-1) 
+              (list 6 3 2 2 4 4 3 8 7 7 9 9 8 6))
+
+;---------------------------------------------------------------------------
+;
+;
+;                             MAKE-PRE-ORDER-EVENTS
+;
+;
+;---------------------------------------------------------------------------
+
+; BST -> List<Number>
+; Same concept as the make-in-order-events function, the only difference is the combination
+; of two pre-orders
+
+(define (make-pre-order-events tree)
   (cond [(leaf? tree) '()]
         [else (append (list(node-value tree))
                       (list(node-value tree))
-                      (foo-pre-order (node-left tree))
-                      (foo-pre-order (node-right tree)))]))
+                      (make-pre-order-events (node-left tree))
+                      (make-pre-order-events (node-right tree)))]))
 
-(check-expect (foo-pre-order SET-1) 
+(check-expect (make-pre-order-events SET-1) 
               (list 6 6 3 3 2 2 4 4 8 8 7 7 9 9 ))
                       
-                           
-
-
-
 ;---------------------------------------------------------------------------
 ;
 ;
@@ -246,9 +261,9 @@
 ;
 ;---------------------------------------------------------------------------
 
-
 ; Number List<Number> -> Boolean
-; Given a number and a list of numbers, returns a boolean, checks whether a number is contained in a list
+; Given a number and a list of numbers, returns a boolean,
+; true if the number is present, false if not
 
 (define (contains? x xs)
   (cond [(empty? xs) #false]
@@ -281,7 +296,6 @@
 (check-expect (take 4 (list 1 2 3 4)) (list 1 2 3 4))
 (check-expect (take 0 (list 1 2 3 4)) empty)
 
-
 ;--------------------------------------------------------------------------
 ;
 ;
@@ -291,7 +305,7 @@
 ;---------------------------------------------------------------------------
 
 ; Number List<Number> -> List<Number>
-; Given a number and a list, return the last n elements of the list
+; Given a number and a list, return the list with n elements less
 
 (define (drop n xs)
   (cond [(zero? n) xs]
@@ -316,7 +330,6 @@
 (define (set-color i xs)
   (set-color-helper i (drop i xs) xs))
 
-
 ;--------------------------------------------------------------------------
 ;
 ;
@@ -325,10 +338,9 @@
 ;
 ;---------------------------------------------------------------------------
 
-
 ; Number List<Number> List<Number> -> posn
-; Helper function for the one above which required to have the list dropping some indices multiple times
-; is not passed as a parameter
+; Helper function for the one above, such that the list with dropped elements
+; is passed as a paramenter instead of being compute multiple times
 
 (define (set-color-helper i dropped xs) 
   (cond [(contains? (first dropped) (take  i xs)) (make-posn (first dropped) 2)]
@@ -410,7 +422,6 @@
 (define LEVEL-NUMBER (max-depth TREE))
 (define LEVEL-DEPTH (/ HEIGTH  LEVEL-NUMBER))
 
-
 ;--------------------------------------------------------------------------
 ;
 ;
@@ -419,9 +430,10 @@
 ;
 ;---------------------------------------------------------------------------
 
-; BST Number Number Number -> BST
+; BST Number Number Number Number -> BST
 ; Given a BST with nodes that don't have their coordinates set yet,
-; and a first pair or numbers, representing the x and y of the root node
+; and a first number, representing the y of the root node, a left-bound, a right-bound
+; and a level depth
 ; returns the whole tree with all nodes with their coordinates set, such that the left sub-tree
 ; has the root in the left half and the right sub-tree have the root in the right half,
 ; one level below for the y coordinate
@@ -493,19 +505,29 @@
 ;Given a number representing the maximum number of nodes that the lowest level can have,
 ;returns a value for the radius of the nodes, such that on that lowest level they do not
 ;touch each other
-(define (set-radius number-of-nodes margin)
-  (- (/ WIDTH  number-of-nodes) margin) )
+(define (set-radius number-of-nodes)
+  (/ WIDTH  number-of-nodes))
 
-(check-expect (set-radius 5 10) 290)
+(check-expect (set-radius 5) 300)
+
+;BST -> Number
+;given a tree returns the y margin from the top that it should have when displayed:
+;It should be either the radius that a node would have when displyed, or, if that value
+;is bigger than the depth (how deep each new level goes) divide by 2 ( meaning that 2 nodes would touch when displayed),
+;it is simply the depth divided by 2
+
+(define (get-y-margin tree)
+  (min (set-radius (get-number-node-lower-level (max-depth tree)))
+       (/ (/ HEIGTH (max-depth tree)) 2)))
 
 
 ; GLOBAL CONSTANTS
 (define MAX-NODES-LOWER-LEVEL (get-number-node-lower-level LEVEL-NUMBER))
-(define RADIUS (set-radius MAX-NODES-LOWER-LEVEL 10))
+(define RADIUS (set-radius MAX-NODES-LOWER-LEVEL))
 (define MARGIN-TOP (+ RADIUS (* 0.5 RADIUS)))
 (define FONT-SIZE (-(* 2 RADIUS) (/ RADIUS 10)))
-(define LIST-OF-LINES (save-line (set-coord TREE MARGIN-TOP 0 WIDTH LEVEL-DEPTH)))         
-(define LIST-OF-NODES (save-nodes (set-coord TREE MARGIN-TOP 0 WIDTH LEVEL-DEPTH)))
+(define LIST-OF-LINES (save-line (set-coord TREE 0 0 WIDTH LEVEL-DEPTH)))         
+(define LIST-OF-NODES (save-nodes (set-coord TREE 0 0 WIDTH LEVEL-DEPTH)))
 (define EMPTY-CANVAS  (empty-scene WIDTH HEIGTH "transparent")) 
 (define ARROW (overlay/xy (rectangle 25 25 "solid" "black") 25 -10 (rotate -90 (triangle 45 "solid" "black" ))))
 (define CANVAS (overlay/xy
@@ -521,18 +543,14 @@
                                                                 0 15
                                                                 (overlay/xy (text "- RED NODE = VISITED" 15 "black")
                                                                             0 15
-                                                                            (overlay/xy (text "- GREEN NODE = MARKED" 15 "black")
+                                                                            (text "- GREEN NODE = MARKED" 15 "black")))))))
                                         
-                                       ( - WIDTH 200) 0
-                                       ARROW)))))))
-                  -20 -20
-                                             EMPTY-CANVAS))
-(define FOO (foo TREE))
-(define FOO-POST-ORDER (foo-post-order TREE))
-(define STARTING-APP (make-app (set-coord TREE MARGIN-TOP 0 WIDTH LEVEL-DEPTH) 0 0 0 LEVEL-DEPTH FOO-POST-ORDER))
-
-
-
+                                       
+                -20 -20
+                  EMPTY-CANVAS))
+(define IN-ORDER-EVENTS (make-in-order-events TREE))
+(define POST-ORDER-EVENTS (make-post-order-events TREE))
+(define STARTING-APP (make-app (set-coord TREE (get-y-margin TREE) 0 WIDTH LEVEL-DEPTH) 0 0 0 LEVEL-DEPTH POST-ORDER-EVENTS RADIUS))
 
 ;--------------------------------------------------------------------------
 ;
@@ -542,19 +560,23 @@
 ;
 ;---------------------------------------------------------------------------
 
-; List<List<Number>> -> Image
+; List<List<Number>> Application -> Image
 ; Given a list of list where: the first element of the list contains the x, the second y, the third the value of the node
 ; the fourth the color of the node, returns an image of the nodes with the corresponding position x y, value of node and color
 ; over the image of the lines
 
-(define (draw-dots list)
-  (cond [(empty? list) EMPTY-CANVAS]
-        [else (place-image (overlay (text (number->string(third (first list))) (if (> FONT-SIZE 255) 255 (floor FONT-SIZE)) "black")
-                                    (circle RADIUS "solid" (get-color (fourth (first list)))))
+(define (draw-dots list app)
+  (cond [(empty? list) EMPTY-CANVAS]  
+        [else (place-image (overlay (text (number->string(third (first list))) (max 0 (min 255 (floor (* (app-radius app) 0.8)))) "black")
+                                    (circle (draw-dots-helper (app-radius app)(app-depth app)) "solid" (get-color (fourth (first list)))))
                            (first(first list))(second(first list))
-                           (draw-dots (rest list)))]))
+                           (draw-dots (rest list) app))])) 
 
-
+;Number Number -> Number
+;Given a radius and a depth selects the radius if it's not bigger than depth / 2
+(define (draw-dots-helper radius depth)
+  (cond [(> radius (/ depth 2)) (/ depth 2)]
+        [else radius])) 
 
 ;--------------------------------------------------------------------------
 ;
@@ -562,7 +584,7 @@
 ;                              DRAW-LINES
 ;
 ;
-;---------------------------------------------------------------------------
+;--------------------------------------------------------------------------- 
 
 ; Given a list of posn of posn, returns an image of lines having those coordinates
 ; List<Posn<Posn>> -> Image
@@ -585,7 +607,7 @@
 ;
 ;---------------------------------------------------------------------------
 
-; Given a number, returns a string to define the color of the nodes
+; Given a number, returns the corrisponding color string
 ; Number -> String
 
 (define (get-color x)
@@ -594,9 +616,8 @@
         [else "green"]))
 
 (check-expect (get-color 4) "green")
-(check-expect (get-color 0) "grey")
+(check-expect (get-color 0) "grey") 
 (check-expect (get-color 1) "red")
-
 
 ;--------------------------------------------------------------------------
 ;
@@ -607,9 +628,9 @@
 ;---------------------------------------------------------------------------
 
 ; Number Number BST -> BST
-; Given two number defining the value of the node and the color of the node, and given a tree,
-; returns a new tree with the node where the value is the given x colored in the color of which color stands.
-; It will not have any defense against wrong value as input since it is linked to the function set-color which outputs
+; Given two numbers representing the value of the node and the color of the node, and given a tree,
+; returns a new tree with the node where the value is the given x, colored in the corresponding color.
+; It will not have any defence against wrong values as input since it is only used with the function set-color which outputs
 ; are only valid numbers.
 
 (define (set-color-tree x color tree)
@@ -619,10 +640,7 @@
         [(< x (node-value tree)) (make-node (set-color-tree x color (node-left tree)) (node-value tree) (node-right tree)
                                             (node-x tree) (node-y tree) (node-color tree))]
         [(> x (node-value tree)) (make-node (node-left tree) (node-value tree) (set-color-tree x color (node-right tree))
-                                            (node-x tree) (node-y tree) (node-color tree))]))
-
-
-;(draw-dots (save-nodes (set-color-tree 8 2 (set-coord SET-1 MARGIN-TOP 0 1000))))
+                                            (node-x tree) (node-y tree) (node-color tree))])) 
 
 ;--------------------------------------------------------------------------
 ;
@@ -637,25 +655,22 @@
 ;representing the trees, build that list into a tree ready to be displayed
 
 (define (get-next-tree x xs)
-  (get-next-tree-helper x xs (list-insert-tree(first (drop x xs)))))
+  (get-next-tree-helper (list-insert-tree(first (drop x xs))))) 
 
-
-(define (get-next-tree-helper x xs tree)
-  (set-coord tree MARGIN-TOP 0 WIDTH (/ HEIGTH (max-depth tree))))
-
-
-
+; BST -> BST
+(define (get-next-tree-helper tree) 
+  (set-coord tree (get-y-margin tree) 0 WIDTH (/ HEIGTH (max-depth tree))))  
 
 ;--------------------------------------------------------------------------
 ;
 ;
-;                  k            DRAW-APP
+;                              DRAW-APP
 ;
 ;
 ;---------------------------------------------------------------------------
 
-; Given an app, returns an image
 ; App -> Image
+; Given an app returns the image of that application
 
 (define (draw-app app)
   (place-image (text (cond [(= (app-alg app) 0) "Post-Order" ]
@@ -664,11 +679,9 @@
                (* WIDTH 0.9) (/ HEIGTH 10)
                (overlay
                 (overlay
-                 (draw-dots (save-nodes(app-tree app)))
+                 (draw-dots (save-nodes(app-tree app)) app)
                  (draw-lines (save-line (app-tree app))))
                 CANVAS)))
-
-
 
 ;--------------------------------------------------------------------------
 ;
@@ -679,19 +692,20 @@
 ;---------------------------------------------------------------------------
 
 ; Number Application -> Application
-; Given a number that identifies the iterator and the app itself, returns the application with the
+; Given a number that represents the iterator and the app itself, returns the application with the
 ; iterator increased by one.
 
 (define (next-event i app)
   (cond[( > i (- (length (app-event-list app)) 1)) app]
        [else  (next-event-helper app)])) 
 
+; Application -> Application
 (define (next-event-helper app)
   (make-app (set-color-tree (posn-x(set-color (app-iterator app) (app-event-list app)))
                                                           (posn-y(set-color (app-iterator app) (app-event-list app)))
                                                           (app-tree app)) 
                                           (+ 1(app-iterator app)) (app-alg app)
-                                          (app-current-tree app) (app-depth app) (app-event-list app)))
+                                          (app-current-tree app) (app-depth app) (app-event-list app) (app-radius app)))
 
 ;--------------------------------------------------------------------------
 ;
@@ -701,12 +715,12 @@
 ;
 ;---------------------------------------------------------------------------
 
-
-;  World MouseEvent -> World
-;  Pressing button-down, it triggers the function make-app and returns a make-app
+; Application MouseEvent -> World
+; Given an application and a mouse event, returns an application depending on the
+; mouse event given.
 
 (define (handle-key app key)
-  (cond  [(string=? key "down")
+  (cond  [(string=? key "down") 
          (cond [(= (app-alg app) 0) (next-event (app-iterator app) app)]
                [(= (app-alg app) 1) (next-event (app-iterator app) app)] 
                [(= (app-alg app) 2) (next-event (app-iterator app) app)])]  
@@ -717,19 +731,19 @@
                              0 0
                              (app-current-tree app) 
                              (app-depth app)
-                             (foo-post-order (app-tree app)))]
+                             (make-post-order-events (app-tree app)) (app-radius app))]
         [(string=? key "2") (make-app
                              (clean-colors (app-tree app))
                              0 1 
-                             (app-current-tree app)
+                             (app-current-tree app) 
                              (app-depth app)
-                             (foo (app-tree app)))]
+                             (make-in-order-events (app-tree app))(app-radius app))]
         [(string=? key "3") (make-app
                              (clean-colors (app-tree app))
                              0 2 
                              (app-current-tree app)
-                             (app-depth app)
-                             (foo-pre-order (app-tree app)))]
+                             (app-depth app) 
+                             (make-pre-order-events (app-tree app)) (app-radius app))]
         [else app]))
 
 ;--------------------------------------------------------------------------
@@ -740,30 +754,37 @@
 ;
 ;---------------------------------------------------------------------------
 
-; Application BST -> BST
-; Given an Application and a tree, returns a new tree depends of the algorithm to execute
+; Application BST -> Application
+; Given an Application and a tree, returns a new application with the parameters which
+; depend on the algorithm to execute
 
 (define (change-tree app new-tree)
-  (cond [(= (app-alg app) 0) 
+  (cond [(= (app-alg app) 0)  
          (make-app
                                  (get-next-tree (modulo (+ (app-current-tree app) 1) NUMBER-OF-TREES) LIST-OF-TREES)
                                  0
                                  (app-alg app)
-                                 (modulo (+ (app-current-tree app) 1)  NUMBER-OF-TREES) (app-depth app)
-                                 (foo-post-order new-tree))]
+                                 (modulo (+ (app-current-tree app) 1)  NUMBER-OF-TREES)
+                                 (/ HEIGTH (max-depth new-tree))
+                                 (make-post-order-events new-tree)
+                                 (set-radius (get-number-node-lower-level (max-depth new-tree)) ) )]
         [(= (app-alg app) 1)
           (make-app
                                  (get-next-tree (modulo (+ (app-current-tree app) 1) NUMBER-OF-TREES) LIST-OF-TREES)
                                  0
                                  (app-alg app)
-                                 (modulo (+ (app-current-tree app) 1)  NUMBER-OF-TREES) (app-depth app)
-                                 (foo new-tree))]
+                                 (modulo (+ (app-current-tree app) 1)  NUMBER-OF-TREES)
+                                 (/ HEIGTH (max-depth new-tree))
+                                 (make-in-order-events new-tree)
+                                 (set-radius (get-number-node-lower-level (max-depth new-tree)) ))]
         [(= (app-alg app) 2) (make-app
                                  (get-next-tree (modulo (+ (app-current-tree app) 1) NUMBER-OF-TREES) LIST-OF-TREES)
                                  0
                                  (app-alg app)
-                                 (modulo (+ (app-current-tree app) 1)  NUMBER-OF-TREES) (app-depth app)
-                                 (foo-pre-order new-tree))]
+                                 (modulo (+ (app-current-tree app) 1)  NUMBER-OF-TREES)
+                                 (/ HEIGTH (max-depth new-tree))
+                                 (make-pre-order-events new-tree)
+                                 (set-radius (get-number-node-lower-level (max-depth new-tree)) ))]
         ))
 
 ;--------------------------------------------------------------------------
@@ -775,6 +796,9 @@
 ;---------------------------------------------------------------------------
 
 ; Nothing -> Image
+; Main Function, given any input, starts the big-bang function
+; creating a graphical interface, allowing the user to execute the
+; program.
 
 (define (main _)
   (big-bang STARTING-APP 
@@ -783,5 +807,3 @@
     [on-key handle-key]
     )
   )  
-
-
